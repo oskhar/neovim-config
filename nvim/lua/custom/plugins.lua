@@ -50,6 +50,7 @@ local plugins = {
         "js-debug-adapter",
         "prettier",
         "typescript-language-server",
+        "vue-language-server",
       },
     },
   },

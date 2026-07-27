@@ -3,7 +3,7 @@ return {
     "catppuccin/nvim",
     name = "catppuccin",
     opts = {
-      flavour = "macchiato", -- latte | frappe | macchiato | mocha
+      flavour = "mocha", -- latte | frappe | macchiato | mocha
       integrations = {
         treesitter = true,
         native_lsp = {
@@ -12,7 +12,7 @@ return {
         telescope = true,
         cmp = true,
         gitsigns = true,
-        nvimtree = true,
+        neo_tree = true,
       },
     },
   },

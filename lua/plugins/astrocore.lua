@@ -1,85 +1,124 @@
-if true then return {} end -- WARN: REMOVE THIS LINE TO ACTIVATE THIS FILE
+local function semantic_select(capture)
+  return function() require("semantic_textobjects").select(capture) end
+end
 
--- AstroCore provides a central place to modify mappings, vim options, autocommands, and more!
--- Configuration documentation can be found with `:h astrocore`
--- NOTE: We highly recommend setting up the Lua Language Server (`:LspInstall lua_ls`)
---       as this provides autocomplete and documentation while editing
+local function semantic_mappings()
+  return {
+    af = { semantic_select "function.outer", desc = "Around function/method" },
+    ["if"] = { semantic_select "function.inner", desc = "Inside function/method" },
+    ac = { semantic_select "class.outer", desc = "Around class" },
+    ic = { semantic_select "class.inner", desc = "Inside class" },
+    aa = { semantic_select "parameter.outer", desc = "Around argument" },
+    ia = { semantic_select "parameter.inner", desc = "Inside argument" },
+    ai = { semantic_select "conditional.outer", desc = "Around conditional" },
+    ii = { semantic_select "conditional.inner", desc = "Inside conditional" },
+    al = { semantic_select "loop.outer", desc = "Around loop" },
+    il = { semantic_select "loop.inner", desc = "Inside loop" },
+    aC = { semantic_select "comment.outer", desc = "Around comment" },
+    iC = { semantic_select "comment.outer", desc = "Comment" },
+  }
+end
+
+local function semantic_move(capture, forward)
+  return function() require("semantic_textobjects").move(capture, forward) end
+end
 
 ---@type LazySpec
 return {
   "AstroNvim/astrocore",
   ---@type AstroCoreOpts
   opts = {
-    -- Configure core features of AstroNvim
     features = {
-      large_buf = { size = 1024 * 256, lines = 10000 }, -- set global limits for large files for disabling features like treesitter
-      autopairs = true, -- enable autopairs at start
-      cmp = true, -- enable completion at start
-      diagnostics = { virtual_text = true, virtual_lines = false }, -- diagnostic settings on startup
-      highlighturl = true, -- highlight URLs at start
-      notifications = true, -- enable notifications at start
+      -- Generated files and logs should not trigger expensive syntax/UI work.
+      large_buf = { notify = false, size = 512 * 1024, lines = 20000, line_length = 1000 },
+      autopairs = true,
+      cmp = true,
+      diagnostics = { virtual_text = true, virtual_lines = false },
+      highlighturl = false,
+      notifications = true,
     },
-    -- Diagnostics configuration (for vim.diagnostics.config({...})) when diagnostics are on
     diagnostics = {
-      virtual_text = true,
+      virtual_text = { spacing = 2, source = "if_many" },
       underline = true,
+      severity_sort = true,
+      update_in_insert = false,
     },
-    -- passed to `vim.filetype.add`
-    filetypes = {
-      -- see `:h vim.filetype.add` for usage
-      extension = {
-        foo = "fooscript",
-      },
-      filename = {
-        [".foorc"] = "fooscript",
-      },
-      pattern = {
-        [".*/etc/foo/.*"] = "fooscript",
-      },
-    },
-    -- vim options can be configured here
     options = {
-      opt = { -- vim.opt.<key>
-        relativenumber = true, -- sets vim.opt.relativenumber
-        number = true, -- sets vim.opt.number
-        spell = false, -- sets vim.opt.spell
-        signcolumn = "yes", -- sets vim.opt.signcolumn to yes
-        wrap = true, -- sets vim.opt.wrap
-      },
-      g = { -- vim.g.<key>
-        -- configure global vim variables (vim.g)
-        -- NOTE: `mapleader` and `maplocalleader` must be set in the AstroNvim opts or before `lazy.setup`
-        -- This can be found in the `lua/lazy_setup.lua` file
+      opt = {
+        relativenumber = true,
+        number = true,
+        spell = false,
+        signcolumn = "yes",
+        wrap = true,
+        linebreak = true,
+        breakindent = true,
+        updatetime = 300,
+        timeoutlen = 400,
+        undofile = true,
       },
     },
-    -- Mappings can be configured through AstroCore as well.
-    -- NOTE: keycodes follow the casing in the vimdocs. For example, `<Leader>` must be capitalized
     mappings = {
-      -- first key is the mode
       n = {
-        -- second key is the lefthand side of the map
-
-        -- navigate buffer tabs
-        ["]b"] = { function() require("astrocore.buffer").nav(vim.v.count1) end, desc = "Next buffer" },
-        ["[b"] = { function() require("astrocore.buffer").nav(-vim.v.count1) end, desc = "Previous buffer" },
-
-        -- mappings seen under group name "Buffer"
-        ["<Leader>bd"] = {
-          function()
-            require("astroui.status.heirline").buffer_picker(
-              function(bufnr) require("astrocore.buffer").close(bufnr) end
-            )
-          end,
-          desc = "Close buffer from tabline",
+        ["<Leader>a"] = { desc = "Local AI" },
+        ["<Leader>aa"] = {
+          function() require("local_ai").ask() end,
+          desc = "Ask offline AI about current buffer",
         },
-
-        -- tables with just a `desc` key will be registered with which-key if it's installed
-        -- this is useful for naming menus
-        -- ["<Leader>b"] = { desc = "Buffers" },
-
-        -- setting a mapping to false will disable it
-        -- ["<C-S>"] = false,
+        ["<Leader>t"] = { desc = "Test" },
+        ["<Leader>tt"] = {
+          function() require("project_tasks").test_file() end,
+          desc = "Test current file/package",
+        },
+        ["<Leader>tT"] = {
+          function() require("project_tasks").test_all() end,
+          desc = "Test entire project",
+        },
+        ["<Leader>tb"] = {
+          function() require("project_tasks").test_nearest() end,
+          desc = "Test nearest to cursor",
+        },
+        ["<Leader>r"] = { desc = "Run/Build" },
+        ["<Leader>rr"] = {
+          function() require("project_tasks").run() end,
+          desc = "Run application",
+        },
+        ["<Leader>rb"] = {
+          function() require("project_tasks").build() end,
+          desc = "Build project",
+        },
+        ["<Leader>rl"] = {
+          function() require("project_tasks").run_last() end,
+          desc = "Repeat last project task",
+        },
+        ["]m"] = { semantic_move("function.outer", true), desc = "Next method/function" },
+        ["[m"] = { semantic_move("function.outer", false), desc = "Previous method/function" },
+        ["]c"] = { semantic_move("class.outer", true), desc = "Next class" },
+        ["[c"] = { semantic_move("class.outer", false), desc = "Previous class" },
+        ["<Leader>ga"] = {
+          function() require("git_tasks").add_current() end,
+          desc = "Git add current file",
+        },
+        ["<Leader>gA"] = {
+          function() require("git_tasks").add_all() end,
+          desc = "Git add all changes",
+        },
+        ["<Leader>gc"] = {
+          function() require("git_tasks").commit() end,
+          desc = "Git commit (Commitizen aware)",
+        },
+        ["<Leader>gP"] = {
+          function() require("git_tasks").push() end,
+          desc = "Git push",
+        },
       },
+      v = {
+        ["<Leader>aa"] = {
+          function() require("local_ai").ask_visual() end,
+          desc = "Ask offline AI about selection",
+        },
+      },
+      o = semantic_mappings(),
+      x = semantic_mappings(),
     },
   },
 }

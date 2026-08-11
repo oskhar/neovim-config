@@ -77,10 +77,31 @@ return {
           function() require("project_tasks").test_nearest() end,
           desc = "Test nearest to cursor",
         },
+        ["<Leader>tf"] = {
+          function() require("project_tasks").test_nearest_full() end,
+          desc = "Test nearest with full log",
+        },
         ["<Leader>r"] = { desc = "Run/Build" },
         ["<Leader>rr"] = {
           function() require("project_tasks").run() end,
           desc = "Run application",
+        },
+        ["<Leader>rs"] = {
+          function() require("project_tasks").stop() end,
+          desc = "Stop application",
+        },
+        ["<Leader>ro"] = {
+          function() require("project_tasks").toggle_log() end,
+          desc = "Toggle application log",
+        },
+        ["<Leader>j"] = { desc = "Java" },
+        ["<Leader>jc"] = {
+          function() require("java_cache").clear_project() end,
+          desc = "Clear current project JDTLS cache",
+        },
+        ["<Leader>jt"] = {
+          function() require("java_test_generator").open_or_generate() end,
+          desc = "Open or generate Spring Boot test for current Java file",
         },
         ["<Leader>rb"] = {
           function() require("project_tasks").build() end,
@@ -115,6 +136,12 @@ return {
         ["<Leader>aa"] = {
           function() require("local_ai").ask_visual() end,
           desc = "Ask offline AI about selection",
+        },
+      },
+      t = {
+        ["<Leader>ro"] = {
+          function() require("project_tasks").toggle_log() end,
+          desc = "Hide application log",
         },
       },
       o = semantic_mappings(),

@@ -15,7 +15,7 @@ return {
       },
       timeout_ms = 2000,
     },
-    servers = { "gopls", "jdtls" },
+    servers = { "gopls", "jdtls", "spring_boot_ls", "html", "sqls" },
     config = {
       gopls = {
         settings = {
@@ -44,8 +44,14 @@ return {
         },
       },
       jdtls = {
-        -- Mason's wrapper forwards these arguments to the JVM.
-        cmd = { "jdtls", "--jvm-arg=-Xms128m", "--jvm-arg=-Xmx768m" },
+        -- Load Mason's Lombok agent so JDTLS understands generated constructors,
+        -- getters, setters, and other Lombok-generated members.
+        cmd = {
+          "jdtls",
+          "--jvm-arg=-Xms128m",
+          "--jvm-arg=-Xmx768m",
+          "--jvm-arg=-javaagent:" .. vim.fn.stdpath "data" .. "/mason/share/jdtls/lombok.jar",
+        },
         settings = {
           java = {
             maxConcurrentBuilds = 1,
@@ -54,6 +60,9 @@ return {
                 "org.junit.jupiter.api.Assertions.*",
                 "org.mockito.Mockito.*",
                 "java.util.Objects.requireNonNull",
+                "org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*",
+                "org.springframework.test.web.servlet.result.MockMvcResultHandlers.*",
+                "org.springframework.test.web.servlet.result.MockMvcResultMatchers.*",
               },
               filteredTypes = {
                 "com.sun.*",
@@ -74,6 +83,39 @@ return {
           },
         },
       },
+      spring_boot_ls = {
+        cmd = {
+          "java",
+          "-Xmx768m",
+          "-Dsts.lsp.client=vscode",
+          "-Dspring.main.web-application-type=NONE",
+          "-Dspring.config.location=classpath:/application.properties",
+          "-Djdk.util.zip.disableZip64ExtraFieldValidation=true",
+          "-jar",
+          vim.fn.stdpath "data"
+            .. "/mason/packages/vscode-spring-boot-tools/extension/language-server/"
+            .. "spring-boot-language-server-2.2.0-SNAPSHOT-exec.jar",
+        },
+        filetypes = { "jproperties" },
+        root_markers = { "pom.xml", "mvnw", "gradlew", "build.gradle", "build.gradle.kts", ".git" },
+        get_language_id = function(_, _) return "spring-boot-properties" end,
+        init_options = {
+          enableJdtClasspath = false,
+        },
+        capabilities = {
+          workspace = {
+            executeCommand = { dynamicRegistration = true },
+          },
+        },
+      },
+      sqls = {
+        filetypes = { "sql", "mysql", "plsql" },
+        settings = {
+          sqls = {
+            connections = {},
+          },
+        },
+      },
     },
     autocmds = {},
     mappings = {
@@ -86,6 +128,13 @@ return {
       },
     },
     on_attach = function(client, bufnr)
+      -- sqls' formatter can rewrite MariaDB/MySQL DDL and statement
+      -- boundaries. Keep its completion and diagnostics, but never let it
+      -- modify SQL buffers during save or a generic LSP format request.
+      if client.name == "sqls" then
+        client.server_capabilities.documentFormattingProvider = false
+        client.server_capabilities.documentRangeFormattingProvider = false
+      end
       if vim.b[bufnr].large_buf then client.server_capabilities.semanticTokensProvider = nil end
     end,
   },

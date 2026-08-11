@@ -32,3 +32,28 @@ git clone https://github.com/<your_user>/<your_repository> ~/.config/nvim
 ```shell
 nvim
 ```
+
+## Spring Initializr TUI (Arch Linux)
+
+Installer ini memasang release native terbaru dari
+[Spring Initializr TUI](https://github.com/danvega/spring-initializr-tui) ke
+`~/.local/bin/spring-tui`. Tidak membutuhkan JDK dan tidak menggunakan `sudo`.
+
+```shell
+~/.config/nvim/scripts/install-spring-tui.sh
+```
+
+Setelah instalasi, buka direktori tempat proyek baru akan dibuat lalu jalankan:
+
+```shell
+mkdir -p ~/Projects
+cd ~/Projects
+spring-tui
+```
+
+Script aman dijalankan kembali untuk memasang release terbaru. Lokasi instalasi
+dapat diganti jika diperlukan:
+
+```shell
+INSTALL_DIR="$HOME/bin" ~/.config/nvim/scripts/install-spring-tui.sh
+```

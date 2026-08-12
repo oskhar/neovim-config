@@ -84,7 +84,7 @@ return {
         ["<Leader>r"] = { desc = "Run/Build" },
         ["<Leader>rr"] = {
           function() require("project_tasks").run() end,
-          desc = "Run application",
+          desc = "Run application with saved arguments",
         },
         ["<Leader>rs"] = {
           function() require("project_tasks").stop() end,

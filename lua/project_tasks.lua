@@ -5,6 +5,7 @@ local running_task
 local last_application_buffer
 local application_status = { state = "stopped", label = "App: stopped" }
 local test_notification_timeout = 30000
+local run_config_file = vim.fn.stdpath "data" .. "/project_tasks_run_config.json"
 
 local function set_application_status(state, label)
   application_status = { state = state, label = label }
@@ -32,6 +33,32 @@ local function executable(root, local_name, fallback)
   return fallback
 end
 
+local function canonical(path)
+  return (vim.uv or vim.loop).fs_realpath(path) or vim.fs.normalize(path)
+end
+
+local function find_upward(start, name)
+  local found = vim.fs.find(name, { path = start, upward = true, type = "file", limit = 1 })
+  return found[1]
+end
+
+local function maven_context(file)
+  local start = file ~= "" and vim.fs.dirname(file) or (vim.uv or vim.loop).cwd()
+  local pom = find_upward(start, "pom.xml")
+  if not pom then return nil end
+
+  -- The closest pom.xml owns the opened file. A wrapper may live in that module
+  -- or in any parent (common in multi-module/microservice repositories).
+  local module_root = vim.fs.dirname(pom)
+  local wrapper = find_upward(module_root, "mvnw")
+  return {
+    kind = "maven",
+    root = module_root,
+    file = file,
+    tool = wrapper or "mvn",
+  }
+end
+
 local function context()
   local file = vim.api.nvim_buf_get_name(0)
   local root = vim.fs.root(0, markers)
@@ -39,13 +66,8 @@ local function context()
 
   if exists(join(root, "go.mod")) then
     return { kind = "go", root = root, file = file }
-  elseif exists(join(root, "pom.xml")) or exists(join(root, "mvnw")) then
-    return {
-      kind = "maven",
-      root = root,
-      file = file,
-      tool = executable(root, "mvnw", "mvn"),
-    }
+  elseif find_upward(file ~= "" and vim.fs.dirname(file) or root, "pom.xml") then
+    return maven_context(file)
   elseif
     exists(join(root, "gradlew"))
     or exists(join(root, "build.gradle"))
@@ -60,6 +82,46 @@ local function context()
   end
 
   return nil, "Hanya proyek Go, Maven, dan Gradle yang didukung"
+end
+
+local function read_run_configs()
+  local ok, lines = pcall(vim.fn.readfile, run_config_file)
+  if not ok or #lines == 0 then return {} end
+  local decoded_ok, configs = pcall(vim.json.decode, table.concat(lines, "\n"))
+  return decoded_ok and type(configs) == "table" and configs or {}
+end
+
+local function write_run_configs(configs)
+  vim.fn.mkdir(vim.fs.dirname(run_config_file), "p")
+  local ok, err = pcall(vim.fn.writefile, { vim.json.encode(configs) }, run_config_file)
+  if not ok then vim.notify("Gagal menyimpan Program arguments: " .. tostring(err), vim.log.levels.ERROR) end
+  return ok
+end
+
+local function saved_program_arguments(ctx)
+  local config = read_run_configs()[canonical(ctx.root)]
+  return type(config) == "table" and config.program_arguments or ""
+end
+
+local function save_program_arguments(ctx, arguments)
+  local configs = read_run_configs()
+  configs[canonical(ctx.root)] = {
+    program_arguments = arguments,
+    pom = join(canonical(ctx.root), "pom.xml"),
+  }
+  return write_run_configs(configs)
+end
+
+local function maven_run_task(ctx, arguments)
+  local cmd = { ctx.tool }
+  if arguments ~= "" then cmd[#cmd + 1] = "-Dspring-boot.run.arguments=" .. arguments end
+  cmd[#cmd + 1] = "spring-boot:run"
+  return {
+    title = "Maven run: " .. vim.fs.basename(ctx.root),
+    cmd = cmd,
+    cwd = ctx.root,
+    context = ctx,
+  }
 end
 
 local function relative_package(ctx)
@@ -528,7 +590,7 @@ local function resolve(action)
     if ctx.kind == "go" then
       return go_run(ctx)
     elseif ctx.kind == "maven" then
-      return { title = "Maven run", cmd = { ctx.tool, "spring-boot:run" }, cwd = ctx.root }
+      return maven_run_task(ctx, saved_program_arguments(ctx))
     else
       return { title = "Gradle run", cmd = { ctx.tool, "bootRun" }, cwd = ctx.root }
     end
@@ -567,7 +629,28 @@ function M.test_nearest_full()
   end
   terminal_output(task)
 end
-function M.run() dispatch("run", true) end
+function M.run()
+  local ctx, err = context()
+  if not ctx then
+    vim.notify(err, vim.log.levels.ERROR)
+    return
+  end
+  if ctx.kind ~= "maven" then
+    dispatch("run", true)
+    return
+  end
+
+  vim.ui.input({
+    prompt = "Program arguments [" .. vim.fs.basename(ctx.root) .. "]: ",
+    default = saved_program_arguments(ctx),
+  }, function(arguments)
+    if arguments == nil then return end
+    arguments = vim.trim(arguments)
+    if not save_program_arguments(ctx, arguments) then return end
+
+    terminal(maven_run_task(ctx, arguments))
+  end)
+end
 function M.build() dispatch "build" end
 
 function M.stop()
